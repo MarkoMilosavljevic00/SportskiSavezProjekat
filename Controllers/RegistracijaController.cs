@@ -13,38 +13,33 @@ namespace Proba.Controllers
 {
     [ApiController]
     [Route("[controller]")]
-    public class IspitController : ControllerBase
+    public class RegistracijaController : ControllerBase
     {
         public SavezContext Context { get; set; }
 
-        public IspitController(SavezContext context)
+        public RegistracijaController(SavezContext context)
         {
             Context = context;
         }
 
 
         #region DODAVANJE_REGISTRACIJE
-        [Route("DodajRegistraciju")]
+        [Route("DodajRegistraciju/{idTakmicara}/{idTakmicenja}/{idKluba}")]
         [HttpPost]
-        public async Task<ActionResult> DodajRegistraciju(int idTakmicara, int idTakmicenja, int idKluba, DateTime datumRegistracije)
+        public async Task<ActionResult> DodajRegistraciju(int idTakmicara, int idTakmicenja, int idKluba)
         {
-            if (idTakmicara < 0)
-            {
-                return BadRequest("Greska kod id-a takmicara!");
-            }
-            if (idKluba < 0)
-            {
-                return BadRequest("Greska kod id-a kluba!");
-            }
-            if (idTakmicenja < 0)
-            {
-                return BadRequest("Greska kod id-a takmicenja!");
-            }
-            if (datumRegistracije.CompareTo(new DateTime(2000, 1, 1)) < 0
-            || datumRegistracije.CompareTo(DateTime.Now) > 0)
-            {
-                return BadRequest("Greska kod datuma registracije!");
-            }
+            // if (idTakmicara < 0)
+            // {
+            //     return BadRequest("Greska kod id-a takmicara!");
+            // }
+            // if (idKluba < 0)
+            // {
+            //     return BadRequest("Greska kod id-a kluba!");
+            // }
+            // if (idTakmicenja < 0)
+            // {
+            //     return BadRequest("Greska kod id-a takmicenja!");
+            // }
 
             try
             {
@@ -52,33 +47,46 @@ namespace Proba.Controllers
                 var takmicenje = await Context.Takmicenja.Where(p => p.ID == idTakmicenja).FirstOrDefaultAsync();
                 var klub = await Context.Klubovi.Where(p => p.ID == idKluba).FirstOrDefaultAsync();
 
-                Registruje r = new Registruje()
+
+                var postojiLiRegistracija = await Context.Registracije
+                                        .Include(p => p.Takmicar)
+                                        .Include(p => p.Takmicenje)
+                                        .Include(p => p.Klub)
+                                        .Where(p => p.Takmicar.ID == idTakmicara
+                                                && p.Takmicenje.ID == idTakmicenja).FirstOrDefaultAsync();
+
+                if (postojiLiRegistracija == null)
                 {
-                    Takmicar = takmicar,
-                    Takmicenje = takmicenje,
-                    Klub = klub,
-                    Datum_registracije = datumRegistracije
-                };
 
-                Context.Registracije.Add(r);
-                await Context.SaveChangesAsync();
+                    Registruje r = new Registruje()
+                    {
+                        Takmicar = takmicar,
+                        Takmicenje = takmicenje,
+                        Klub = klub,
+                        Datum_registracije = DateTime.Now
+                    };
 
-                var podaciOTakmicaru = Context.Registracije
-                                        .Include(p=>p.Takmicar)
-                                        .Include(p=>p.Takmicenje)
-                                        .Include(p=>p.Klub)
-                                        .Where(p=>p.Takmicar.ID == idTakmicara)
-                                        .Select(p=>
+                    Context.Registracije.Add(r);
+                    await Context.SaveChangesAsync();
+                }
+
+                var podaciOTakmicaru = await Context.Registracije
+                                        .Include(p => p.Takmicar)
+                                        .Include(p => p.Takmicenje)
+                                        .Include(p => p.Klub)
+                                        .Where(p => p.Takmicar.ID == idTakmicara)
+                                        .Select(p =>
                                         new
                                         {
+                                            Klub = p.Klub.Naziv,
                                             Ime = p.Takmicar.Ime,
                                             Prezime = p.Takmicar.Prezime,
-                                            Klub = p.Klub.Naziv,
+                                            Pol = p.Takmicar.Pol,
                                             Takmicenje = p.Takmicenje.Naziv,
-                                            Sport = p.Takmicenje.Sport,
-                                            Kategorija = p.Takmicenje.Kategorija
+                                            Kategorija = p.Takmicar.Kategorija,
+                                            Datum_registracije = p.Datum_registracije
                                         }).ToListAsync();
-                return Ok("Uspesno zavedena registracija sa sledecim podacima:\n" + podaciOTakmicaru);
+                return Ok(podaciOTakmicaru);
             }
             catch (Exception e)
             {

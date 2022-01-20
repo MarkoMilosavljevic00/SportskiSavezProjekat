@@ -24,6 +24,7 @@ namespace Models
         
         public DateTime Datum_odrzavanja { get; set; }
 
+        [JsonIgnore]
         public virtual Organizator Organizator { get; set; }
 
         [JsonIgnore]

@@ -29,8 +29,8 @@ namespace WebAPI.Controllers
             return Ok(await Context.Klubovi.Select(p =>
                 new
                 {
-                    ID = p.ID,
-                    Naziv = p.Naziv
+                    p.ID,
+                    p.Naziv
                 }).ToListAsync());
         }
         #endregion

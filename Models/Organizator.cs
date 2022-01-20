@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace Models
 {
@@ -19,6 +20,7 @@ namespace Models
         [MaxLength(100)]
         public string Sportski_objekat { get; set; }
 
+        [JsonIgnore]
         public virtual List<Takmicenje> Takmicenja { get; set; }
 
     }

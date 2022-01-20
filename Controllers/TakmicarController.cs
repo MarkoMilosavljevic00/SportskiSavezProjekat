@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -21,12 +22,12 @@ namespace WebAPI.Controllers
         }
 
         #region PREUZIMANJE_TAKMICARA
-        [Route("PreuzmiTakmicara")]
+        [Route("PreuzmiTakmicare")]
         [HttpGet]
-        public async Task<ActionResult> PreuzmiTakmicara()
+        public async Task<ActionResult> PreuzmiTakmicare()
         {
             var takmicari = Context.Takmicari
-                            .Include(p => p.Registracije.Where(p=>p.Klub.ID == 1 || p.Takmicar.Ime.Equals("Novak")))
+                            .Include(p => p.Registracije)
                             .ThenInclude(p => p.Takmicenje)
                             .Include(p => p.Registracije)
                             .ThenInclude(p => p.Klub);
@@ -42,6 +43,8 @@ namespace WebAPI.Controllers
                         Ime = p.Ime,
                         Prezime = p.Prezime,
                         Pol = p.Pol,
+                        Kategorija = p.Kategorija,
+                        Sport = p.Sport,
                         Registracija = p.Registracije
                             // .Where(q => rokIDs.Contains(q.IspitniRok.ID))
                             .Select(q =>
@@ -60,13 +63,64 @@ namespace WebAPI.Controllers
 
             // return Ok(Context.Takmicari);
         }
+
+
+        [Route("NadjiTakmicaraPoTakmicenju/{idTakmicenja}")]
+        [HttpGet]
+        public async Task<ActionResult> NadjiTakmicaraPoTakmicenju(int idTakmicenja)
+        {
+            try
+            {
+                // if (idTakmicenja < 0)
+                // {
+                //     return BadRequest("Greska kod id takmicenja!");
+                // }
+
+                var takmicenja = Context.Takmicenja.Where(p => p.ID == idTakmicenja).FirstOrDefault();
+
+                if (takmicenja == null)
+                {
+                    return BadRequest("Nema takvog takmicenja!");
+                }
+                var takmicariPoTakmicenju = Context.Registracije
+                    .Include(p => p.Takmicar)
+                    .Include(p => p.Takmicenje)
+                    .Include(p => p.Klub)
+                    .Where(p => p.Takmicenje.ID == idTakmicenja);
+
+
+                var takmicar = await takmicariPoTakmicenju.ToListAsync();
+
+
+                return Ok
+                (
+                    takmicar.Select(p =>
+                    new
+                    {
+                        Klub = p.Klub.Naziv,
+                        Ime = p.Takmicar.Ime,
+                        Prezime = p.Takmicar.Prezime,
+                        Pol = p.Takmicar.Pol,
+                        Takmicenje = p.Takmicenje.Naziv,
+                        Kategorija = p.Takmicar.Kategorija,
+                        Datum_registracije = p.Datum_registracije
+
+                    }).ToList()
+                );
+            }
+            catch (Exception e)
+            {
+                return BadRequest(e.Message);
+            }
+        }
+
         #endregion
 
 
         #region DODAVANJE_TAKMICARA
-        [Route("DodajTakmicara")]
+        [Route("DodajTakmicaraFromBody")]
         [HttpPost]
-        public async Task<ActionResult> DodajTakmicara([FromBody] Takmicar takmicar)
+        public async Task<ActionResult> DodajTakmicaraFB([FromBody] Takmicar takmicar)
         {
             if (string.IsNullOrWhiteSpace(takmicar.Ime)
             || takmicar.Ime.Length > 50)
@@ -103,6 +157,77 @@ namespace WebAPI.Controllers
                 Context.Takmicari.Add(takmicar);
                 await Context.SaveChangesAsync();
                 return Ok($"Dodat je takmicar {takmicar.Ime} {takmicar.Prezime}");
+            }
+            catch (Exception e)
+            {
+                return BadRequest(e.Message);
+            }
+        }
+
+
+
+        [Route("DodajTakmicara/{ime}/{prezime}/{pol}/{sport}/{kategorija}")]
+        [HttpPost]
+        public async Task<ActionResult> DodajTakmicara(string ime, string prezime, string pol, string sport, string kategorija)
+        {
+            if (string.IsNullOrWhiteSpace(ime)
+            || ime.Length > 50)
+            {
+                return BadRequest("Greska kod imena!");
+            }
+
+            if (string.IsNullOrWhiteSpace(prezime)
+           || prezime.Length > 50)
+            {
+                return BadRequest("Greska kod prezimena!");
+            }
+
+            if (string.IsNullOrWhiteSpace(pol)
+            || pol.Length > 1
+               || !(pol.Equals("M") || pol.Equals("Z")))
+            {
+                return BadRequest("Greska kod pola!");
+            }
+            if (string.IsNullOrWhiteSpace(sport)
+            || sport.Length > 50)
+            {
+                return BadRequest("Greska kod sporta!");
+            }
+
+            if (string.IsNullOrWhiteSpace(kategorija)
+                         || kategorija.Length > 50)
+            {
+                return BadRequest("Greska kod kategorije!");
+            }
+            try
+            {
+                var takmicar = await Context.Takmicari
+                                .Where(p => p.Ime.Equals(ime)
+                                && p.Prezime.Equals(prezime)
+                                && p.Pol.Equals(pol)
+                                && p.Sport.Equals(sport)
+                                && p.Kategorija.Equals(kategorija)).FirstOrDefaultAsync();
+
+
+                if (takmicar == null)
+                {
+                    Takmicar t = new Takmicar()
+                    {
+                          Ime = ime,
+                          Prezime = prezime,
+                          Pol = pol,
+                          Sport = sport,
+                          Kategorija = kategorija
+                    };
+                    Context.Takmicari.Add(t);
+                    await Context.SaveChangesAsync();
+                    return Ok(t);
+                }
+                else
+                {
+                    return StatusCode(202, takmicar);
+                }
+
             }
             catch (Exception e)
             {

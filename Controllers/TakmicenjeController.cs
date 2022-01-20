@@ -26,16 +26,19 @@ namespace WebAPI.Controllers
         [HttpGet]
         public async Task<ActionResult>PreuzmiTakmicenje(/*[FromQuery]int id*/)
         {
-            return Ok(await Context.Takmicenja./*Where(s=>s.ID = id).*/Select(p =>
-                new
-                {
-                    ID = p.ID,
-                    Naziv = p.Naziv,
-                    Sport = p.Sport,
-                    Kategorija = p.Kategorija,
-                    DatumOdrzavanja = p.Datum_odrzavanja,
-                    Organizacija = p.Organizator
-                }).ToListAsync());
+            // return Ok(await Context.Takmicenja./*Where(s=>s.ID = id).*/Select(p =>
+            //     new
+            //     {
+            //         ID = p.ID,
+            //         Naziv = p.Naziv,
+            //         Sport = p.Sport,
+            //         Kategorija = p.Kategorija,
+            //         DatumOdrzavanja = p.Datum_odrzavanja,
+            //         Organizacija = p.Organizator
+            //     }).ToListAsync());
+
+
+            return Ok(await Context.Takmicenja.Select(p => new { p.ID, p.Naziv, p.Sport ,p.Kategorija, p.Datum_odrzavanja,p.Organizator}).ToListAsync());
         }
         #endregion
 
@@ -62,8 +65,7 @@ namespace WebAPI.Controllers
             {
                 return BadRequest("Greska kod kategorije!");
             }
-            if (takmicenje.Datum_odrzavanja.CompareTo(new DateTime(2000,01,01)) < 0
-            || takmicenje.Datum_odrzavanja.CompareTo(DateTime.Now) > 0)
+            if (takmicenje.Datum_odrzavanja.CompareTo(new DateTime(2000,01,01)) < 0)
             {
                 return BadRequest("Greska kod datuma!");
             }

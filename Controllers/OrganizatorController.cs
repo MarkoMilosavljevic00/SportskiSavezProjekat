@@ -55,9 +55,9 @@ namespace WebAPI.Controllers
 
 
         #region DODAVANJE_ORGANIZATORA
-        [Route("DodajOrganizatora/{idTakmicenja}/{naziv}/{sredstva}/")]
+        [Route("DodajOrganizatora/{naziv}/{sredstva}/{sportskiObj}/{idTakmicenja}")]
         [HttpPost]
-        public async Task<ActionResult> DodajOrganizatora(int idTakmicenja, string naziv, double sredstva, string sportskiObj)
+        public async Task<ActionResult> DodajOrganizatora(string naziv, double sredstva, string sportskiObj, int idTakmicenja)
         {
             if (idTakmicenja < 0)
             {
@@ -76,43 +76,67 @@ namespace WebAPI.Controllers
                 return BadRequest("Greska kod sredstava, minimalna vrednost je 100000!");
             }
 
-            if (string.IsNullOrWhiteSpace(sportskiObj)
-            || sportskiObj.Length > 100)
+            if (sportskiObj.Length > 100)
             {
                 return BadRequest("Greska kod naziva sportskog objekta!");
             }
 
             try
             {
-                var takmicenje = await Context.Takmicenja.Where(p => p.ID == idTakmicenja).ToListAsync();
+                // var postojiLiTakmicenje = await Context.Takmicenja.Where(p => p.ID == idTakmicenja).FirstOrDefaultAsync();
+                // if (postojiLiTakmicenje == null)
+                // {
+                //     return BadRequest("Takmicenje ne postoji!");
+                // }
 
-                Organizator o = new Organizator()
+                var organizator = await Context.Organizatori
+                                    .Include(p => p.Takmicenja)
+                                    .Where(p => p.Naziv == naziv).FirstOrDefaultAsync();
+
+
+                var takmicenje = await Context.Takmicenja
+                                                .Include(p => p.Organizator)
+                                                .Where(p => p.ID == idTakmicenja).FirstOrDefaultAsync();
+
+                var takmicenjeLista = await Context.Takmicenja
+                                                .Include(p=>p.Organizator)
+                                                .Where(p=>p.ID == idTakmicenja).ToListAsync();
+
+
+                if (takmicenje == null)
                 {
-                    Naziv = naziv,
-                    Sredstva = sredstva,
-                    Sportski_objekat = sportskiObj,
-                    Takmicenja = takmicenje
-                };
+                    return BadRequest("Takmicenje ne postoji!");
+                }
 
-                Context.Organizatori.Add(o);
-                await Context.SaveChangesAsync();
-
-                // var podaciOTakmicaru = Context.Registracije
-                //                         .Include(p=>p.Takmicar)
-                //                         .Include(p=>p.Takmicenje)
-                //                         .Include(p=>p.Klub)
-                //                         .Where(p=>p.Takmicar.ID == idTakmicara)
-                //                         .Select(p=>
-                //                         new
-                //                         {
-                //                             Ime = p.Takmicar.Ime,
-                //                             Prezime = p.Takmicar.Prezime,
-                //                             Klub = p.Klub.Naziv,
-                //                             Takmicenje = p.Takmicenje.Naziv,
-                //                             Sport = p.Takmicenje.Sport,
-                //                             Kategorija = p.Takmicenje.Kategorija
-                //                         }).ToListAsync();
-                return Ok($"Uspesno zaveden organizator {naziv} takmicenja {takmicenje.Select(p=>p.Naziv)}");
+                if (takmicenje.Organizator != null && sredstva <= takmicenje.Organizator.Sredstva)
+                {
+                    return StatusCode(202, takmicenje.Organizator);
+                }
+                else
+                {
+                    if (organizator == null)
+                    {
+                        Organizator o = new Organizator()
+                        {
+                            Naziv = naziv,
+                            Sredstva = sredstva,
+                            Sportski_objekat = sportskiObj,
+                            Takmicenja = takmicenjeLista
+                        };
+                        //  o.Takmicenja.Add(takmicenje);
+                        // takmicenje.Organizator = o;
+                        Context.Organizatori.Add(o);
+                        await Context.SaveChangesAsync();
+                        return Ok(o);
+                    }
+                    else
+                    {
+                        organizator.Takmicenja.Add(takmicenje);
+                        // takmicenje.Organizator = organizator;
+                        await Context.SaveChangesAsync();
+                        return StatusCode(203, organizator);
+                    }
+                }
             }
             catch (Exception e)
             {
@@ -135,6 +159,7 @@ namespace WebAPI.Controllers
             {
                 var org = await Context.Organizatori.FindAsync(id);
                 string naziv = org.Naziv;
+                org.Takmicenja.ForEach(p=>p.Organizator=null);
                 Context.Organizatori.Remove(org);
                 await Context.SaveChangesAsync();
                 return Ok($"Uspešno izbrisan organizator {naziv}");
